@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ Núcleo ============
+
+model User {
+  id              Int      @id @default(autoincrement())
+  email           String   @unique
+  passwordHash    String?
+  ssoProvider     String?
+  name            String
+  phone           String?
+  language        String   @default("es-AR")
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  preferences     UserPreferences?
+  memberships     Membership[]
+  providerProfile ProviderProfile?
+}
+
+model UserPreferences {
+  id                Int     @id @default(autoincrement())
+  userId            Int     @unique
+  user              User    @relation(fields: [userId], references: [id])
+  notifChannel      String  @default("push")
+  notifFrequency    String  @default("immediate")
+  alternativePhone  String?
+}
+
+model Condominium {
+  id          Int      @id @default(autoincrement())
+  name        String
+  type        String
+  address     String?
+  taxId       String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  units       Unit[]
+  memberships Membership[]
+}
+
+model Unit {
+  id            Int      @id @default(autoincrement())
+  condominiumId Int
+  condominium   Condominium @relation(fields: [condominiumId], references: [id])
+  label         String
+  coefficient   Decimal?
+  metadata      Json?
+
+  memberships   Membership[]
+  bookings      AmenityBooking[]
+  charges       Charge[]
+}
+
+model Role {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+
+  memberships Membership[]
+  invitations Invitation[]
+}
+
+model Membership {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  user              User     @relation(fields: [userId], references: [id])
+  condominiumId     Int
+  condominium       Condominium @relation(fields: [condominiumId], references: [id])
+  unitId            Int?
+  unit              Unit?    @relation(fields: [unitId], references: [id])
+  roleId            Int
+  role              Role     @relation(fields: [roleId], references: [id])
+  ownerMembershipId Int?
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+}
+
+model Invitation {
+  id              Int      @id @default(autoincrement())
+  email           String
+  condominiumId   Int
+  roleId          Int
+  role            Role     @relation(fields: [roleId], references: [id])
+  unitId          Int?
+  code            String   @unique
+  invitedByUserId Int?
+  status          String   @default("pending")
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  entityType  String
+  entityId    Int
+  action      String
+  actorUserId Int?
+  changes     Json
+  createdAt   DateTime @default(now())
+}
+
+// ============ Expensas ============
+
+model Expense {
+  id                 Int      @id @default(autoincrement())
+  condominiumId      Int
+  type               String
+  description        String
+  amount             Decimal
+  date               DateTime
+  allocationCriteria String   @default("general_coefficient")
+  createdAt          DateTime @default(now())
+
+  allocations        ExpenseAllocation[]
+}
+
+model ExpenseAllocation {
+  id             Int     @id @default(autoincrement())
+  expenseId      Int
+  expense        Expense @relation(fields: [expenseId], references: [id])
+  unitId         Int
+  assignedAmount Decimal
+}
+
+model Settlement {
+  id            Int      @id @default(autoincrement())
+  condominiumId Int
+  period        String
+  status        String   @default("draft")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+
+  invoices      Invoice[]
+}
+
+model Invoice {
+  id           Int      @id @default(autoincrement())
+  settlementId Int
+  settlement   Settlement @relation(fields: [settlementId], references: [id])
+  unitId       Int
+  totalAmount  Decimal
+  dueDate      DateTime
+  pdfUrl       String?
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+
+  charge       Charge?
+}
+
+// ============ Cobranzas ============
+
+// Nota: Charge.originId era una FK polimórfica en el documento de diseño
+// (apuntaba a Invoice o a AmenityBooking según "origin"). Prisma no soporta
+// eso de forma nativa, así que acá quedó resuelto con dos FKs opcionales,
+// tal como sugería la nota pendiente en esquema-de-datos.md.
+model Charge {
+  id               Int      @id @default(autoincrement())
+  unitId           Int
+  unit             Unit     @relation(fields: [unitId], references: [id])
+  origin           String   // "expense" | "amenity"
+  invoiceId        Int?     @unique
+  invoice          Invoice? @relation(fields: [invoiceId], references: [id])
+  amenityBookingId Int?     @unique
+  amenityBooking   AmenityBooking? @relation(fields: [amenityBookingId], references: [id])
+  amount           Decimal
+  remainingBalance Decimal
+  dueDate          DateTime?
+  createdAt        DateTime @default(now())
+
+  payments         Payment[]
+}
+
+model Payment {
+  id          Int      @id @default(autoincrement())
+  chargeId    Int
+  charge      Charge   @relation(fields: [chargeId], references: [id])
+  amount      Decimal
+  method      String
+  receiptUrl  String?
+  paidAt      DateTime
+  createdAt   DateTime @default(now())
+}
+
+model UnmatchedPayment {
+  id               Int      @id @default(autoincrement())
+  method           String
+  amount           Decimal
+  rawData          Json
+  status           String   @default("pending")
+  assignedChargeId Int?
+  resolvedByUserId Int?
+  createdAt        DateTime @default(now())
+}
+
+// ============ Amenities ============
+
+model Amenity {
+  id                  Int      @id @default(autoincrement())
+  condominiumId       Int
+  name                String
+  bookingLimitPerUnit Int?
+  cost                Decimal?
+  createdAt           DateTime @default(now())
+
+  bookings            AmenityBooking[]
+}
+
+model AmenityBooking {
+  id         Int      @id @default(autoincrement())
+  amenityId  Int
+  amenity    Amenity  @relation(fields: [amenityId], references: [id])
+  unitId     Int
+  unit       Unit     @relation(fields: [unitId], references: [id])
+  userId     Int
+  date       DateTime
+  timeSlot   String?
+  status     String   @default("confirmed")
+  createdAt  DateTime @default(now())
+
+  charge     Charge?
+}
+
+// ============ Contactos ============
+
+model Contact {
+  id            Int      @id @default(autoincrement())
+  condominiumId Int
+  name          String
+  category      String
+  phone         String
+  ownerUserId   Int?
+  visibility    String   @default("public")
+  createdAt     DateTime @default(now())
+}
+
+// ============ Proveedor ============
+
+model ProviderProfile {
+  id                 Int      @id @default(autoincrement())
+  userId             Int      @unique
+  user               User     @relation(fields: [userId], references: [id])
+  specialty          String
+  availableForUrgent Boolean  @default(false)
+  verified           Boolean  @default(false)
+  verifiedByUserId   Int?
+  createdAt          DateTime @default(now())
+}
+
+// ============ Comunicación ============
+
+model Announcement {
+  id            Int      @id @default(autoincrement())
+  condominiumId Int
+  authorId      Int
+  title         String
+  body          String
+  targetScope   String
+  unitId        Int?
+  group         String?
+  createdAt     DateTime @default(now())
+
+  deliveries    SentNotification[]
+}
+
+model SentNotification {
+  id             Int      @id @default(autoincrement())
+  announcementId Int
+  announcement   Announcement @relation(fields: [announcementId], references: [id])
+  userId         Int
+  channel        String
+  status         String   @default("sent")
+  createdAt      DateTime @default(now())
+}
