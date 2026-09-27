@@ -22,6 +22,11 @@
     "@nestjs/cli": "^10.4.0",
     "@types/node": "^22.7.0",
     "prisma": "^5.20.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "@conapp/config": "*",
+    "@nestjs/testing": "^10.4.0",
+    "@types/jest": "^29.5.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0"
   }
 }
