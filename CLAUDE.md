@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Monorepo del MVP de una app de administración de consorcios (Argentina). npm workspaces + Turborepo, TypeScript de punta a punta. Documentación y comentarios de negocio en español; nombres de código (carpetas, archivos, modelos, símbolos) en inglés.
 
-**Estado actual: es un esqueleto.** Solo existe un módulo de ejemplo (`condominiums`, con un service placeholder que devuelve datos vacíos) y el schema Prisma completo. El repo todavía no tiene commits.
+**Estado actual: es un esqueleto.** Solo existe un módulo de ejemplo (`condominiums`, con un service placeholder que devuelve datos vacíos) y el schema Prisma completo.
 
 ## Comandos
 
@@ -30,15 +30,16 @@ npx prisma generate --schema=apps/api/prisma/schema.prisma
 npm run prisma:migrate -w @conapp/api       # prisma migrate dev
 ```
 
-Un test individual (cuando haya): `npm test -w @conapp/api -- <patrón>` (Jest).
+Un test individual: `npm test -w @conapp/api -- <patrón>` (Jest + ts-jest, specs `*.spec.ts` junto al código; solo `apps/api` tiene tests).
 
 CI (`.github/workflows/ci.yml`): Node 20, `npm install` → `lint` → `build` → `test` en cada push/PR.
 
-### Ojo: el tooling está referenciado pero no instalado/configurado
+### Tooling y versiones fijadas
 
-- Los scripts `lint`/`test` usan `eslint`, `jest` y `next lint`, pero **ninguno está en `devDependencies`** ni hay configs (`.eslintrc`, `jest.config`). Hasta que se agreguen, `npm run lint` y `npm run test` van a fallar en los workspaces que los definen (y por lo tanto el CI).
-- `packages/config` (eslint/tsconfig/tailwind compartidos según los docs) existe pero está vacío. Solo `apps/api` tiene `tsconfig.json`.
-- No hay `packages/ui` todavía (aparece en los docs).
+- **ESLint 9 (flat config)** compartido en `packages/config` (`@conapp/config/eslint`); cada workspace tiene un `eslint.config.mjs` que lo reexporta. `web` lintea con `eslint .`, no con `next lint` (Next 14 no soporta flat config). Los tsconfig de cada workspace extienden `@conapp/config/tsconfig.base.json`.
+- **`react`/`react-dom` van fijados en 18.2.0** y `react-native-screens`, `react-native-safe-area-context`, `expo-linking`, `expo-status-bar` en las versiones de Expo 51, vía `overrides` del `package.json` raíz. `react-native 0.74` exige React 18.2.0 exacto; con rangos sueltos npm instala dos copias de React y `next build` falla con "useContext of null", y `expo-router` arrastra paquetes de un SDK más nuevo que rompen `expo export`. No los subas sin subir Expo/React Native. Si cambiás dependencias y quedan copias viejas hoisted, `npm dedupe` las resuelve.
+- `apps/api` compila con `tsconfig.build.json` (excluye specs); `nest-cli.json` lo apunta ahí.
+- Todavía no hay `packages/ui`; `packages/config` solo tiene eslint y el tsconfig base (los docs también prevén tailwind).
 
 ## Arquitectura
 

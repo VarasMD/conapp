@@ -10,6 +10,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "@conapp/config": "*"
   }
 }

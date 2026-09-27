@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "name": "Consorcios App",
+    "slug": "conapp",
+    "scheme": "conapp",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "platforms": ["ios", "android"]
+  }
+}
